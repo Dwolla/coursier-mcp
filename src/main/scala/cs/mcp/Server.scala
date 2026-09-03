@@ -14,6 +14,7 @@ import ch.linkyard.mcp.server.McpServer.ConnectionInfo
 import ch.linkyard.mcp.server.McpServer.Session
 import ch.linkyard.mcp.server.McpServer.ToolProvider
 import ch.linkyard.mcp.server.ToolFunction
+import cs.mcp.tools.CompleteDepTool
 import cs.mcp.tools.FetchTool
 import fs2.io.file.Files
 import fs2.io.process.Processes
@@ -40,7 +41,7 @@ object Server:
     List(
       notYetImplemented[F]("resolve"),
       FetchTool.default[F],
-      notYetImplemented[F]("complete-dep"),
+      CompleteDepTool.default[F],
       notYetImplemented[F]("java-home"),
     )
 
