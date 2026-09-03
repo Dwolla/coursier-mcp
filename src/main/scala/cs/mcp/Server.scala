@@ -1,6 +1,7 @@
 package cs.mcp
 
 import cats.MonadThrow
+import cats.effect.kernel.Concurrent
 import cats.effect.kernel.Resource
 import cats.syntax.all.*
 import ch.linkyard.mcp.jsonrpc2.JsonRpc.ErrorCode
@@ -13,6 +14,9 @@ import ch.linkyard.mcp.server.McpServer.ConnectionInfo
 import ch.linkyard.mcp.server.McpServer.Session
 import ch.linkyard.mcp.server.McpServer.ToolProvider
 import ch.linkyard.mcp.server.ToolFunction
+import cs.mcp.tools.FetchTool
+import fs2.io.file.Files
+import fs2.io.process.Processes
 import io.circe.JsonObject
 
 object Server:
@@ -32,10 +36,15 @@ object Server:
         McpError.raise(ErrorCode.InternalError, s"$name is not implemented yet").widen,
     )
 
-  def readOnlyTools[F[_]: MonadThrow]: List[ToolFunction[F]] =
-    List("resolve", "fetch", "complete-dep", "java-home").map(notYetImplemented[F])
+  def readOnlyTools[F[_]: {Concurrent, Processes, Files}]: List[ToolFunction[F]] =
+    List(
+      notYetImplemented[F]("resolve"),
+      FetchTool.default[F],
+      notYetImplemented[F]("complete-dep"),
+      notYetImplemented[F]("java-home"),
+    )
 
-  def apply[F[_]: MonadThrow]: McpServer[F] = new McpServer[F]:
+  def apply[F[_]: {Concurrent, Processes, Files}]: McpServer[F] = new McpServer[F]:
     override def initialize(client: Client[F], info: ConnectionInfo[F]): Resource[F, Session[F]] =
       Resource.pure(new Session[F] with ToolProvider[F]:
         override val serverInfo: PartyInfo = Server.serverInfo
