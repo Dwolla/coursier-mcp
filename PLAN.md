@@ -98,6 +98,30 @@ these choices.
   `Map[String, String]` conflict_resolution into a `List[ConflictResolution]`
   case class). Check this again if a future tool's natural shape wants
   `Option`/`Map`.
+- `cs complete-dep`'s `-e`/`--scala-version` flag is not just documentation
+  filler — confirmed by reading coursier's own source
+  (`coursier.core.Repository.Complete.parse`, in the `coursier` module,
+  *not* `coursier-core`) and verifying against the real binary. It's
+  required to resolve the sbt-style `org::name` / `org:::name` shorthand
+  (double/triple colon = "cross-built artifact, fill in the Scala
+  suffix for me"): without `--scala-version`, `org::name` silently
+  matches nothing (empty completions, exit 0), and `org::name:`
+  (asking for version completions through the shorthand) throws
+  `MalformedInput` — exit 1, Java stack trace on stderr, which the
+  existing non-zero-exit-surfaces-stderr handling already covers fine.
+  With `--scala-version` set, `org::name` completions come back with
+  the Scala suffix already stripped (e.g. `cats-effect-kernel`, not
+  `cats-effect-kernel_3`).
+- `com.melvinlow:scala-json-schema`'s missing `Option` support (noted
+  above) needed an actual workaround once `complete-dep` gained an
+  optional `scalaVersion` arg: a local
+  `given JsonSchemaEncoder[Option[T]]` that just delegates to `T`'s
+  schema. This is safe because melvinlow's product encoder never
+  populates JSON Schema's `required` array regardless, so an `Option`
+  field and a plain field already rendered identically anyway — the
+  instance only unblocks derivation, it doesn't change output. Reuse
+  this (extract to a shared spot if a third tool needs it) rather than
+  re-deriving it per tool.
 - `io.circe`'s core `Decoder`/`Encoder.AsObject` companions natively
   support `derives Decoder, Encoder.AsObject` on Scala 3 case classes
   (confirmed via `circe-core_3` sources: `object Decoder extends
