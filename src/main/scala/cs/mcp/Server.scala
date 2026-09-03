@@ -1,0 +1,44 @@
+package cs.mcp
+
+import cats.MonadThrow
+import cats.effect.kernel.Resource
+import cats.syntax.all.*
+import ch.linkyard.mcp.jsonrpc2.JsonRpc.ErrorCode
+import ch.linkyard.mcp.protocol.Initialize.PartyInfo
+import ch.linkyard.mcp.server.CallContext
+import ch.linkyard.mcp.server.McpError
+import ch.linkyard.mcp.server.McpServer
+import ch.linkyard.mcp.server.McpServer.Client
+import ch.linkyard.mcp.server.McpServer.ConnectionInfo
+import ch.linkyard.mcp.server.McpServer.Session
+import ch.linkyard.mcp.server.McpServer.ToolProvider
+import ch.linkyard.mcp.server.ToolFunction
+import io.circe.JsonObject
+
+object Server:
+  private val serverInfo: PartyInfo = PartyInfo(name = "cs-mcp", version = "0.1.0")
+
+  private def notYetImplemented[F[_]: MonadThrow](name: String): ToolFunction[F] =
+    ToolFunction.native[F](
+      info = ToolFunction.Info(
+        name = name,
+        title = None,
+        description = None,
+        effect = ToolFunction.Effect.ReadOnly,
+        isOpenWorld = true,
+      ),
+      argsSchema = JsonObject.empty,
+      f = (_: JsonObject, _: CallContext[F]) =>
+        McpError.raise(ErrorCode.InternalError, s"$name is not implemented yet").widen,
+    )
+
+  def readOnlyTools[F[_]: MonadThrow]: List[ToolFunction[F]] =
+    List("resolve", "fetch", "complete-dep", "java-home").map(notYetImplemented[F])
+
+  def apply[F[_]: MonadThrow]: McpServer[F] = new McpServer[F]:
+    override def initialize(client: Client[F], info: ConnectionInfo[F]): Resource[F, Session[F]] =
+      Resource.pure(new Session[F] with ToolProvider[F]:
+        override val serverInfo: PartyInfo = Server.serverInfo
+        override def instructions: F[Option[String]] = none.pure[F]
+        override def tools: F[List[ToolFunction[F]]] = readOnlyTools[F].pure[F]
+      )
