@@ -61,6 +61,35 @@ these choices.
   `complete-dep` (or any `complete*` command) — it's undocumented at that
   level but works fine when invoked directly, e.g.
   `cs complete-dep org.typelevel:cats-effect`.
+- `cs fetch --json-output-file`'s actual JSON shape (confirmed by running
+  it):
+  ```json
+  {
+    "conflict_resolution": {"requested:coord": "resolved:coord"},
+    "dependencies": [
+      {"coord": "...", "file": "...", "directDependencies": [...], "dependencies": [...]}
+    ],
+    "version": "0.1.0"
+  }
+  ```
+  `conflict_resolution` is only present/non-empty when a version conflict
+  was resolved.
+- `com.melvinlow:scala-json-schema` 0.2.0 (the `JsonSchemaEncoder` used by
+  `ToolFunction.structured`) only ships instances for `String`/`Int`/
+  `Long`/`Double`/`Float`/`Boolean`/`Null`/`List`/`Array`, plus
+  auto-derivation for product/sum types built from those — **no `Option`
+  or `Map` instance**. Tool args/result case classes must avoid `Option`
+  and `Map` fields (e.g. `FetchTool` remaps `cs`'s raw
+  `Map[String, String]` conflict_resolution into a `List[ConflictResolution]`
+  case class). Check this again if a future tool's natural shape wants
+  `Option`/`Map`.
+- `io.circe`'s core `Decoder`/`Encoder.AsObject` companions natively
+  support `derives Decoder, Encoder.AsObject` on Scala 3 case classes
+  (confirmed via `circe-core_3` sources: `object Decoder extends
+  DecoderDerivation`, `object Encoder.AsObject extends ...
+  EncoderDerivation`) — no need to pull in `circe-generic`'s
+  `semiauto.deriveDecoder`/`deriveEncoder`, even though circe-generic is
+  on the classpath transitively via `mcp-server`.
 
 ## Project layout (single sbt module — no multi-module split needed here)
 
@@ -92,7 +121,14 @@ cs-mcp/
 2. Protocol-layer test: `Server` responds to `tools/list` with the four
    read-only tools registered — no subprocess involved.
 3. `FetchTool` (has the confirmed `--json-output-file` flag): unit test
-   against a fake `CsProcess`, then one real integration test. Then
+   against a fake `CsProcess`, then one real integration test. DONE —
+   `FetchTool.apply[F: {Concurrent, Files}](runCs: List[String] => F[CsResult])`
+   takes the `cs` invocation as an injected function (fake in unit tests,
+   `CsProcess.run[F]` in `FetchTool.default`), which is how `ResolveTool`
+   and the rest should take their `CsProcess` dependency too, so their
+   JSON/text-parsing and error-surfacing logic stays unit-testable without
+   shelling out. Non-zero exit surfaces `cs`'s stderr via
+   `ToolFunction.ToolError` so the client sees the real failure. Next:
    `ResolveTool`, which parses plain-text output since it has no JSON flag.
 4. Repeat for the remaining read-only tools.
 5. `LaunchTool`: unit test that `elicit()` is called before any process
