@@ -5,14 +5,22 @@ import cats.syntax.all.*
 import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.server.ToolFunction
 import ch.linkyard.mcp.server.ToolFunction.ToolError
+import com.melvinlow.json.schema.JsonSchemaEncoder
 import com.melvinlow.json.schema.generic.auto.given
 import cs.mcp.CsProcess
 import cs.mcp.CsResult
 import fs2.io.process.Processes
 import io.circe.Decoder
 import io.circe.Encoder
+import io.circe.Json
 
-final case class CompleteDepArgs(prefix: String) derives Decoder
+// scala-json-schema 0.2.0 has no Option instance (see PLAN.md); an optional
+// field renders the same as its underlying type, since melvinlow's product
+// encoder never populates JSON Schema's "required" array anyway.
+private given optionJsonSchemaEncoder[T](using enc: JsonSchemaEncoder[T]): JsonSchemaEncoder[Option[T]] with
+  def schema: Json = enc.schema
+
+final case class CompleteDepArgs(prefix: String, scalaVersion: Option[String] = None) derives Decoder
 
 final case class CompleteDepResult(completions: List[String]) derives Encoder.AsObject
 
@@ -34,8 +42,9 @@ object CompleteDepTool:
     runCs: List[String] => F[CsResult],
     args: CompleteDepArgs,
   ): F[CompleteDepResult] =
+    val scalaVersionFlag = args.scalaVersion.toList.flatMap(version => List("--scala-version", version))
     for
-      result <- runCs(List("complete-dep", args.prefix))
+      result <- runCs("complete-dep" :: scalaVersionFlag ::: List(args.prefix))
       _ <- failIfNonZero[F](result)
     yield CompleteDepResult(result.stdout.linesIterator.filter(_.nonEmpty).toList)
 
