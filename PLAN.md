@@ -24,7 +24,10 @@ these choices.
   automatically as the `cs` binary itself is updated.
 - **Tool surface:** curated typed tool per command, not one generic
   "run cs" tool.
-  - Read-only, no confirmation: `resolve`, `fetch`, `complete`, `java-home`.
+  - Read-only, no confirmation: `resolve`, `fetch`, `complete-dep`, `java-home`.
+    (Confirmed via `cs complete-dep org.typelevel:cats-effect` — the command
+    is `complete-dep`, not `complete`; it's hidden from `cs --help`/
+    `--help-full`'s top-level command listing but works directly.)
   - Mutating/code-executing, **require explicit confirmation via MCP
     elicitation before executing**: `launch`, `install`, `setup`. Tool
     handler calls `Client[F].elicit()` showing the exact argv that will run;
@@ -34,20 +37,30 @@ these choices.
     alone).
 - **Transport:** stdio only for v1. No HTTP transport yet (YAGNI).
 
-## Open unknowns — verify, don't assume
+## Verified facts (confirmed against installed `cs` 2.1.13 and Maven Central)
 
-- `scala-effect-mcp`'s actual `crossScalaVersions`. README's example jar
-  path shows `scala-3.8.1`; I could not confirm 2.13/2.12 cross-publishing
-  before handoff. Check Maven Central / Scaladex for the real published
-  artifact coordinates before locking `build.sbt`'s Scala version. If
-  Scala 3-only, that overrides the usual "prefer 2.13 for apps" default.
-- Confirmed: `cs fetch --json-output-file <path>` produces structured JSON
-  (not just line-oriented text) — good, use it instead of parsing stdout.
-  NOT confirmed whether `cs resolve` supports the same flag; check when
-  building that tool. If it doesn't, `fetch` with a resolve-only flag
-  combination may be a better structured-output source than `resolve`
-  itself — worth checking coursier's docs before assuming plain-text
-  parsing is required.
+- `scala-effect-mcp` is **Scala 3-only**, published at version `0.3.5`.
+  `cs resolve "ch.linkyard.mcp:mcp-server_3:latest.release"` succeeds;
+  `_2.13` and `_2.12` both 404 on Maven Central. This overrides the usual
+  "prefer 2.13 for apps" default — `build.sbt` targets Scala 3 (3.8.x line,
+  per the transitively-pulled `scala-library-3.8.3`).
+- `cs fetch --json-output-file <path>` produces structured JSON (hidden
+  flag, visible only via `cs fetch --help-full`) — use it instead of
+  parsing stdout.
+- `cs resolve` does **not** support `--json-output-file`, even as a hidden
+  option (checked `cs resolve --help-full`). No resolve-only flag on
+  `fetch` was found either (no `--resolve-only`/`--no-fetch` equivalent).
+  Decide explicitly before slice 3: either `ResolveTool` does plain-text
+  parsing, or `FetchTool` becomes the JSON-structured tool and `resolve`
+  stays text-based.
+- `cs --version` does **not** print a version string — it exits 0 but
+  prints the full usage/help text. The actual version command is
+  `cs version` (prints e.g. `2.1.13`). TDD slice 1 below is updated to use
+  `List("version")` instead of `List("--version")`.
+- The top-level `cs --help`/`--help-full` command listing does not include
+  `complete-dep` (or any `complete*` command) — it's undocumented at that
+  level but works fine when invoked directly, e.g.
+  `cs complete-dep org.typelevel:cats-effect`.
 
 ## Project layout (single sbt module — no multi-module split needed here)
 
@@ -60,7 +73,7 @@ cs-mcp/
     tools/
       ResolveTool.scala
       FetchTool.scala
-      CompleteTool.scala
+      CompleteDepTool.scala
       JavaHomeTool.scala
       LaunchTool.scala   // elicits confirmation, then delegates to CsProcess
       InstallTool.scala
@@ -73,17 +86,22 @@ cs-mcp/
 
 ## First TDD slices, in order
 
-1. `CsProcessSpec`: `CsProcess.run(List("--version"))` returns exit code 0
+1. `CsProcessSpec`: `CsProcess.run(List("version"))` returns exit code 0
    and stdout containing a version string, using the real `cs` binary
    (integration-tagged; skip if `cs` isn't on PATH).
 2. Protocol-layer test: `Server` responds to `tools/list` with the four
    read-only tools registered — no subprocess involved.
-3. `ResolveTool` (or `FetchTool`, whichever gets a confirmed JSON flag
-   first): unit test against a fake `CsProcess`, then one real integration
-   test.
+3. `FetchTool` (has the confirmed `--json-output-file` flag): unit test
+   against a fake `CsProcess`, then one real integration test. Then
+   `ResolveTool`, which parses plain-text output since it has no JSON flag.
 4. Repeat for the remaining read-only tools.
 5. `LaunchTool`: unit test that `elicit()` is called before any process
    runs, and that a declined confirmation never invokes `CsProcess`.
+
+## Workflow
+
+- No GitHub repo set up yet — local git only. Work happens on branches;
+  no PRs. Merge to `main` locally once Brian approves the work on a branch.
 
 ## Not in scope for v1
 
