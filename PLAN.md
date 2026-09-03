@@ -36,6 +36,21 @@ these choices.
     are set too, but are non-binding on the client, so don't rely on them
     alone).
 - **Transport:** stdio only for v1. No HTTP transport yet (YAGNI).
+- **`fetch`/`resolve` return local filesystem paths, not file content —
+  this depends on stdio's same-machine deployment model.** `cs fetch`
+  downloads JARs into coursier's local cache and `FetchTool` returns the
+  `file` paths into that cache, not the JAR bytes. That's only meaningful
+  because stdio MCP servers run as a child process of the client on the
+  client's own machine, so server and client share a filesystem — the
+  returned paths are directly usable by whoever asked. This assumption
+  breaks for a remote/HTTP transport: a remote client can't see the
+  server's local cache, so paths alone would be useless. If HTTP
+  transport is ever added, `fetch` (and any other tool returning local
+  paths) needs to change to embed actual content (`Content.Blob`,
+  base64-encoded) instead — which is awkward for JARs, since transitive
+  dependency sets can be tens of MB. Revisit this explicitly before
+  adding HTTP transport; don't just re-expose the same tool shapes over
+  a new transport.
 
 ## Verified facts (confirmed against installed `cs` 2.1.13 and Maven Central)
 
@@ -141,6 +156,8 @@ cs-mcp/
 
 ## Not in scope for v1
 
-- HTTP transport.
+- HTTP transport. See the path-vs-content caveat under "Decisions made"
+  above — this isn't just a transport swap, it changes `fetch`'s output
+  shape.
 - `channel`, `list`, `update`, `uninstall`, `search` commands — not
   discussed yet; ask before adding.
