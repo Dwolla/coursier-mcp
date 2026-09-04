@@ -14,12 +14,6 @@ import io.circe.Decoder
 import io.circe.Encoder
 import io.circe.Json
 
-// scala-json-schema 0.2.0 has no Option instance (see PLAN.md); an optional
-// field renders the same as its underlying type, since melvinlow's product
-// encoder never populates JSON Schema's "required" array anyway.
-private given optionJsonSchemaEncoder[T](using enc: JsonSchemaEncoder[T]): JsonSchemaEncoder[Option[T]] with
-  def schema: Json = enc.schema
-
 final case class ResolveArgs(dependencies: List[String], scalaVersion: Option[String] = None) derives Decoder
 
 final case class ResolvedDependency(

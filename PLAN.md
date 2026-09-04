@@ -117,14 +117,18 @@ these choices.
   `cats-effect-kernel_3`).
 - `com.melvinlow:scala-json-schema`'s missing `Option` support (noted
   above) needed an actual workaround once `complete-dep` gained an
-  optional `scalaVersion` arg: a local
-  `given JsonSchemaEncoder[Option[T]]` that just delegates to `T`'s
-  schema. This is safe because melvinlow's product encoder never
-  populates JSON Schema's `required` array regardless, so an `Option`
-  field and a plain field already rendered identically anyway — the
-  instance only unblocks derivation, it doesn't change output. Reuse
-  this (extract to a shared spot if a third tool needs it) rather than
-  re-deriving it per tool.
+  optional `scalaVersion` arg: a top-level `private given
+  JsonSchemaEncoder[Option[T]]` in `CompleteDepTool.scala` that just
+  delegates to `T`'s schema. This is safe because melvinlow's product
+  encoder never populates JSON Schema's `required` array regardless, so
+  an `Option` field and a plain field already rendered identically
+  anyway — the instance only unblocks derivation, it doesn't change
+  output. A top-level `private` definition in Scala 3 is
+  **package-private, not file-private** — `ResolveTool.scala` (same
+  `cs.mcp.tools` package) resolves it automatically without its own
+  copy or an import. Don't redeclare it per file; if a tool outside
+  `cs.mcp.tools` ever needs it, that's when to move it somewhere
+  broader.
 - **`cs java-home` is not purely read-only — it can silently download and
   install a full JDK.** Its own `--help` says so ("Install the requested
   JVM if it is not already installed"), and I confirmed it directly: `cs
