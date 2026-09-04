@@ -21,4 +21,9 @@ lazy val root = (project in file("."))
       "org.scalameta" %% "munit-scalacheck" % munitScalacheckVersion % Test,
     ),
     testFrameworks += new TestFramework("munit.Framework"),
+    // MainSpec spawns `java -cp <classpath> cs.mcp.Main` and relies on
+    // sys.props("java.class.path") reflecting the real runtime classpath.
+    // Without forking, tests run in sbt's own JVM, whose classpath is just
+    // sbt-launch.jar.
+    Test / fork := true,
   )
