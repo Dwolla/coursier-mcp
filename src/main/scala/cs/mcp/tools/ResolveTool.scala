@@ -5,14 +5,12 @@ import cats.syntax.all.*
 import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.server.ToolFunction
 import ch.linkyard.mcp.server.ToolFunction.ToolError
-import com.melvinlow.json.schema.JsonSchemaEncoder
 import com.melvinlow.json.schema.generic.auto.given
 import cs.mcp.CsProcess
 import cs.mcp.CsResult
 import fs2.io.process.Processes
 import io.circe.Decoder
 import io.circe.Encoder
-import io.circe.Json
 
 final case class ResolveArgs(dependencies: List[String], scalaVersion: Option[String] = None) derives Decoder
 
