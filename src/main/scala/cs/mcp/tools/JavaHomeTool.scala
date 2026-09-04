@@ -32,7 +32,7 @@ object JavaHomeTool:
     ToolFunction.structured[F, JavaHomeArgs, JavaHomeResult](info, (args, _) => javaHome[F](client, runCs, args))
 
   def default[F[_]: {Concurrent, Processes}](client: McpServer.Client[F]): ToolFunction[F] =
-    apply[F](client, CsProcess.run[F])
+    apply[F](client, CsProcess.run[F](_))
 
   private def javaHome[F[_]: Concurrent](
     client: McpServer.Client[F],

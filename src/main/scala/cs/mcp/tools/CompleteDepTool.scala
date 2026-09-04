@@ -36,7 +36,7 @@ object CompleteDepTool:
   def apply[F[_]: Concurrent](runCs: List[String] => F[CsResult]): ToolFunction[F] =
     ToolFunction.structured[F, CompleteDepArgs, CompleteDepResult](info, (args, _) => completeDep[F](runCs, args))
 
-  def default[F[_]: {Concurrent, Processes}]: ToolFunction[F] = apply[F](CsProcess.run[F])
+  def default[F[_]: {Concurrent, Processes}]: ToolFunction[F] = apply[F](CsProcess.run[F](_))
 
   private def completeDep[F[_]: Concurrent](
     runCs: List[String] => F[CsResult],

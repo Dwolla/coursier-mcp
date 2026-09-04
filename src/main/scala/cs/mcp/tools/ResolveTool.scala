@@ -36,7 +36,7 @@ object ResolveTool:
   def apply[F[_]: Concurrent](runCs: List[String] => F[CsResult]): ToolFunction[F] =
     ToolFunction.structured[F, ResolveArgs, ResolveResult](info, (args, _) => resolve[F](runCs, args))
 
-  def default[F[_]: {Concurrent, Processes}]: ToolFunction[F] = apply[F](CsProcess.run[F])
+  def default[F[_]: {Concurrent, Processes}]: ToolFunction[F] = apply[F](CsProcess.run[F](_))
 
   private def resolve[F[_]: Concurrent](runCs: List[String] => F[CsResult], args: ResolveArgs): F[ResolveResult] =
     val scalaVersionFlag = args.scalaVersion.toList.flatMap(version => List("--scala-version", version))

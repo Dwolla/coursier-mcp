@@ -48,7 +48,7 @@ object FetchTool:
   def apply[F[_]: {Concurrent, Files}](runCs: List[String] => F[CsResult]): ToolFunction[F] =
     ToolFunction.structured[F, FetchArgs, FetchResult](info, (args, _) => fetch[F](runCs, args))
 
-  def default[F[_]: {Concurrent, Processes, Files}]: ToolFunction[F] = apply[F](CsProcess.run[F])
+  def default[F[_]: {Concurrent, Processes, Files}]: ToolFunction[F] = apply[F](CsProcess.run[F](_))
 
   private def fetch[F[_]: {Concurrent, Files}](runCs: List[String] => F[CsResult], args: FetchArgs): F[FetchResult] =
     Files[F].tempFile.use { path =>
