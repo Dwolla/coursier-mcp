@@ -143,6 +143,20 @@ these choices.
   would run) when that probe fails — so the common case (system JVM
   already present) never prompts, but nothing downloads without explicit
   confirmation.
+- `cs resolve`'s plain-text output is one `organization:name:version:configuration`
+  line per resolved dependency (e.g.
+  `org.scala-lang:scala-library:2.13.14:default`), confirmed by running
+  it, including with a forced version conflict (`-V`) — the line always
+  has exactly 4 colon-delimited parts, since none of those segments can
+  contain a raw colon. Non-zero exit puts the resolution error on
+  stderr (e.g. `Resolution error: Error downloading ...`), same shape
+  as `fetch`/`complete-dep`'s failure modes.
+- `cs resolve`'s `--scala-version` flag affects the same sbt-style `::`
+  shorthand as `complete-dep`'s (confirmed: `cs resolve
+  org.typelevel::cats-core:2.13.0` resolves against a different
+  `scala-library`/`scala3-library_3` version with `--scala-version 3`
+  than without it) — so `ResolveTool` got the same optional
+  `scalaVersion` arg as `CompleteDepTool`.
 - `io.circe`'s core `Decoder`/`Encoder.AsObject` companions natively
   support `derives Decoder, Encoder.AsObject` on Scala 3 case classes
   (confirmed via `circe-core_3` sources: `object Decoder extends
@@ -190,8 +204,10 @@ cs-mcp/
    shelling out. Non-zero exit surfaces `cs`'s stderr via
    `ToolFunction.ToolError` so the client sees the real failure. Next:
    `ResolveTool`, which parses plain-text output since it has no JSON flag.
-4. Repeat for the remaining read-only tools. DONE for `complete-dep`
-   (including its `--scala-version` arg). `resolve` still outstanding.
+4. Repeat for the remaining read-only tools. DONE for `complete-dep` and
+   `resolve` (both including their `--scala-version` arg) — all four
+   read-only tools now have real implementations, no stubs left in
+   `Server.scala`.
 5. `JavaHomeTool`: DONE, ahead of `LaunchTool`/`InstallTool`/`SetupTool`
    since it turned out to need the same
    probe-then-elicit-then-confirm pattern (see "Tool surface" and
@@ -206,7 +222,6 @@ cs-mcp/
    pattern as `JavaHomeTool`, always confirming (no offline-probe
    equivalent expected here — check each command's actual semantics
    before assuming).
-7. `ResolveTool`: plain-text parsing, no JSON flag.
 
 ## Workflow
 
