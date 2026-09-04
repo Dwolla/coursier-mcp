@@ -2,9 +2,7 @@ package cs.mcp.tools
 
 import cats.effect.kernel.Concurrent
 import cats.syntax.all.*
-import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.server.ToolFunction
-import ch.linkyard.mcp.server.ToolFunction.ToolError
 import com.melvinlow.json.schema.generic.auto.given
 import cs.mcp.CsProcess
 import cs.mcp.CsResult
@@ -54,7 +52,7 @@ object FetchTool:
     Files[F].tempFile.use { path =>
       for
         result <- runCs("fetch" :: "--json-output-file" :: path.toString :: args.dependencies)
-        _ <- failIfNonZero[F](result)
+        _ <- failIfNonZero[F]("fetch", result)
         json <- Files[F].readUtf8(path).compile.string
         raw <- decode[RawFetchOutput](json).liftTo[F]
       yield FetchResult(
@@ -64,7 +62,3 @@ object FetchTool:
         },
       )
     }
-
-  private def failIfNonZero[F[_]: Concurrent](result: CsResult): F[Unit] =
-    if result.exitCode == 0 then ().pure[F]
-    else ToolError(List(Content.Text(s"cs fetch failed (exit ${result.exitCode}): ${result.stderr}"))).raiseError[F, Unit]

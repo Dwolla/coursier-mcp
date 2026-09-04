@@ -1,5 +1,6 @@
 package cs.mcp.tools
 
+import cats.MonadThrow
 import cats.effect.kernel.Concurrent
 import cats.syntax.all.*
 import ch.linkyard.mcp.protocol.Content
@@ -33,28 +34,22 @@ object ResolveTool:
     isOpenWorld = true,
   )
 
-  def apply[F[_]: Concurrent](runCs: List[String] => F[CsResult]): ToolFunction[F] =
+  def apply[F[_]: MonadThrow](runCs: List[String] => F[CsResult]): ToolFunction[F] =
     ToolFunction.structured[F, ResolveArgs, ResolveResult](info, (args, _) => resolve[F](runCs, args))
 
   def default[F[_]: {Concurrent, Processes}]: ToolFunction[F] = apply[F](CsProcess.run[F](_))
 
-  private def resolve[F[_]: Concurrent](runCs: List[String] => F[CsResult], args: ResolveArgs): F[ResolveResult] =
-    val scalaVersionFlag = args.scalaVersion.toList.flatMap(version => List("--scala-version", version))
+  private def resolve[F[_]: MonadThrow](runCs: List[String] => F[CsResult], args: ResolveArgs): F[ResolveResult] =
     for
-      result <- runCs("resolve" :: scalaVersionFlag ::: args.dependencies)
-      _ <- failIfNonZero[F](result)
+      result <-
+        runCs("resolve" :: optionalFlag("--scala-version", args.scalaVersion) ::: args.dependencies)
+      _ <- failIfNonZero[F]("resolve", result)
       dependencies <- result.stdout.linesIterator.filter(_.nonEmpty).toList.traverse(parseLine[F])
     yield ResolveResult(dependencies)
 
-  private def parseLine[F[_]: Concurrent](line: String): F[ResolvedDependency] =
+  private def parseLine[F[_]: MonadThrow](line: String): F[ResolvedDependency] =
     line.split(":", -1) match
       case Array(organization, name, version, configuration) =>
         ResolvedDependency(organization, name, version, configuration).pure[F]
       case _ =>
         ToolError(List(Content.Text(s"Unexpected cs resolve output line: '$line'"))).raiseError[F, ResolvedDependency]
-
-  private def failIfNonZero[F[_]: Concurrent](result: CsResult): F[Unit] =
-    if result.exitCode == 0 then ().pure[F]
-    else
-      ToolError(List(Content.Text(s"cs resolve failed (exit ${result.exitCode}): ${result.stderr}")))
-        .raiseError[F, Unit]
