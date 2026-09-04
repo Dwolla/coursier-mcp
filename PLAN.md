@@ -39,6 +39,11 @@ these choices.
     are set too, but are non-binding on the client, so don't rely on them
     alone).
 - **Transport:** stdio only for v1. No HTTP transport yet (YAGNI).
+  `Main` wires `Server[IO]` to `StdioJsonRpcConnection.create[IO]`
+  (newline-delimited JSON-RPC, one message per line) — confirmed this
+  matches the actual MCP spec's stdio transport
+  (https://modelcontextprotocol.io/specification/2026-07-28/basic/transports),
+  not just this library's own choice.
 - **`fetch`/`resolve` return local filesystem paths, not file content —
   this depends on stdio's same-machine deployment model.** `cs fetch`
   downloads JARs into coursier's local cache and `FetchTool` returns the
@@ -161,6 +166,29 @@ these choices.
   `scala-library`/`scala3-library_3` version with `--scala-version 3`
   than without it) — so `ResolveTool` got the same optional
   `scalaVersion` arg as `CompleteDepTool`.
+- **`fs2.io.process.Process[F]`'s `stdin`/`stdout` each close their
+  underlying OS stream once their fs2 `Stream` terminates** (fs2-io's
+  `writeOutputStreamCancelable`/`readInputStreamCancelable` default
+  `closeAfterUse = true`, and the process wrapper doesn't override it).
+  Found this while writing `MainSpec`: compiling `.stdin`/`.stdout` more
+  than once (e.g. one `.compile.drain` per outgoing message) closes the
+  pipe after the first message, and the second write throws
+  `IOException: Stream closed`. The whole conversation on each
+  direction must be one continuous `Stream` compiled exactly once —
+  use a `Deferred` (or similar) to gate later messages on earlier
+  responses within that single Stream, and run the write-side and
+  read-side streams concurrently (`parTupled`), rather than making
+  separate `.compile` calls per message in either direction.
+- **sbt's `Test / fork` defaults to `false`**, meaning tests run inside
+  sbt's own JVM — `sys.props("java.class.path")` there is just
+  `sbt-launch.jar`, not the project's real runtime classpath. A test
+  that spawns `java -cp <that> cs.mcp.Main` as a subprocess (like
+  `MainSpec`) gets a `ClassNotFoundException`-killed child process in
+  ~0.3s, which surfaces confusingly as `IOException: Stream closed`
+  when the test then tries to write to that already-dead process's
+  stdin — not an obvious error pointing at the classpath. Fixed with
+  `Test / fork := true` in `build.sbt`, which gives the forked test JVM
+  the real full runtime classpath.
 - `io.circe`'s core `Decoder`/`Encoder.AsObject` companions natively
   support `derives Decoder, Encoder.AsObject` on Scala 3 case classes
   (confirmed via `circe-core_3` sources: `object Decoder extends
