@@ -24,14 +24,17 @@ these choices.
   automatically as the `cs` binary itself is updated.
 - **Tool surface:** curated typed tool per command, not one generic
   "run cs" tool.
-  - Read-only, no confirmation: `resolve`, `fetch`, `complete-dep`, `java-home`.
+  - Read-only, no confirmation: `resolve`, `fetch`, `complete-dep`.
     (Confirmed via `cs complete-dep org.typelevel:cats-effect` — the command
     is `complete-dep`, not `complete`; it's hidden from `cs --help`/
     `--help-full`'s top-level command listing but works directly.)
   - Mutating/code-executing, **require explicit confirmation via MCP
-    elicitation before executing**: `launch`, `install`, `setup`. Tool
-    handler calls `Client[F].elicit()` showing the exact argv that will run;
-    only shells out on explicit confirmation. This is enforced server-side,
+    elicitation before executing**: `launch`, `install`, `setup`, and
+    **`java-home` when it would need to download a JVM** (see verified
+    facts below — `java-home` moved out of the always-read-only group
+    after finding this out empirically). Tool handler calls
+    `Client[F].elicit()` showing the exact argv that will run; only
+    shells out on explicit confirmation. This is enforced server-side,
     not left to client UI hints (`readOnlyHint`/`destructiveHint` annotations
     are set too, but are non-binding on the client, so don't rely on them
     alone).
@@ -122,6 +125,24 @@ these choices.
   instance only unblocks derivation, it doesn't change output. Reuse
   this (extract to a shared spot if a third tool needs it) rather than
   re-deriving it per tool.
+- **`cs java-home` is not purely read-only — it can silently download and
+  install a full JDK.** Its own `--help` says so ("Install the requested
+  JVM if it is not already installed"), and I confirmed it directly: `cs
+  java-home --jvm temurin:1.11` started pulling a ~185MB tarball with no
+  prompt (killed it partway through; had to clean up the leftover
+  `.part`/`.lock` files it left in the real coursier cache). This
+  contradicted the plan's original "read-only, no confirmation" grouping
+  for `java-home` — moved it to the confirmation-required group (see
+  "Tool surface" above). Found a safe way to avoid confirming on every
+  call, though: `cs java-home --mode offline [--jvm ...]` fails fast
+  (`ArtifactError$NotFound`, exit 1, no network touched) if a download
+  would be required, and succeeds immediately with the path if the JVM
+  is already resolvable (already cached, or picked up via system
+  `JAVA_HOME`/PATH detection). `JavaHomeTool` always tries the offline
+  probe first and only elicits confirmation (showing the real argv that
+  would run) when that probe fails — so the common case (system JVM
+  already present) never prompts, but nothing downloads without explicit
+  confirmation.
 - `io.circe`'s core `Decoder`/`Encoder.AsObject` companions natively
   support `derives Decoder, Encoder.AsObject` on Scala 3 case classes
   (confirmed via `circe-core_3` sources: `object Decoder extends
@@ -142,7 +163,7 @@ cs-mcp/
       ResolveTool.scala
       FetchTool.scala
       CompleteDepTool.scala
-      JavaHomeTool.scala
+      JavaHomeTool.scala // offline-probes first, elicits confirmation only if a download is needed
       LaunchTool.scala   // elicits confirmation, then delegates to CsProcess
       InstallTool.scala
       SetupTool.scala
@@ -169,9 +190,23 @@ cs-mcp/
    shelling out. Non-zero exit surfaces `cs`'s stderr via
    `ToolFunction.ToolError` so the client sees the real failure. Next:
    `ResolveTool`, which parses plain-text output since it has no JSON flag.
-4. Repeat for the remaining read-only tools.
-5. `LaunchTool`: unit test that `elicit()` is called before any process
-   runs, and that a declined confirmation never invokes `CsProcess`.
+4. Repeat for the remaining read-only tools. DONE for `complete-dep`
+   (including its `--scala-version` arg). `resolve` still outstanding.
+5. `JavaHomeTool`: DONE, ahead of `LaunchTool`/`InstallTool`/`SetupTool`
+   since it turned out to need the same
+   probe-then-elicit-then-confirm pattern (see "Tool surface" and
+   verified facts above) — `elicit()` is only called when the offline
+   probe fails, and a declined confirmation never invokes the real
+   (downloading) command. Establishes the pattern
+   `LaunchTool`/`InstallTool`/`SetupTool` should follow: tools needing
+   `Client[F]` are constructed inside `Server.apply`'s `initialize`
+   (where `client` is in scope), not in the plain capability-typeclass
+   constructor list.
+6. `LaunchTool`/`InstallTool`/`SetupTool`: same elicit-before-mutate
+   pattern as `JavaHomeTool`, always confirming (no offline-probe
+   equivalent expected here — check each command's actual semantics
+   before assuming).
+7. `ResolveTool`: plain-text parsing, no JSON flag.
 
 ## Workflow
 

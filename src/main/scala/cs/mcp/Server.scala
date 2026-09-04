@@ -16,6 +16,7 @@ import ch.linkyard.mcp.server.McpServer.ToolProvider
 import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.tools.CompleteDepTool
 import cs.mcp.tools.FetchTool
+import cs.mcp.tools.JavaHomeTool
 import fs2.io.file.Files
 import fs2.io.process.Processes
 import io.circe.JsonObject
@@ -37,12 +38,12 @@ object Server:
         McpError.raise(ErrorCode.InternalError, s"$name is not implemented yet").widen,
     )
 
-  def readOnlyTools[F[_]: {Concurrent, Processes, Files}]: List[ToolFunction[F]] =
+  private def allTools[F[_]: {Concurrent, Processes, Files}](client: Client[F]): List[ToolFunction[F]] =
     List(
       notYetImplemented[F]("resolve"),
       FetchTool.default[F],
       CompleteDepTool.default[F],
-      notYetImplemented[F]("java-home"),
+      JavaHomeTool.default[F](client),
     )
 
   def apply[F[_]: {Concurrent, Processes, Files}]: McpServer[F] = new McpServer[F]:
@@ -50,5 +51,5 @@ object Server:
       Resource.pure(new Session[F] with ToolProvider[F]:
         override val serverInfo: PartyInfo = Server.serverInfo
         override def instructions: F[Option[String]] = none.pure[F]
-        override def tools: F[List[ToolFunction[F]]] = readOnlyTools[F].pure[F]
+        override def tools: F[List[ToolFunction[F]]] = allTools[F](client).pure[F]
       )
