@@ -1,5 +1,5 @@
 ThisBuild / scalaVersion := "3.9.0"
-ThisBuild / organization := "cs.mcp"
+ThisBuild / organization := "com.dwolla"
 
 val fs2Version = "3.13.0"
 val catsEffectVersion = "3.7.1"

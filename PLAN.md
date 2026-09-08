@@ -262,13 +262,11 @@ Central (snapshot or release). Once that's done, `cs bootstrap` becomes
 the intended install path:
 
 ```bash
-cs bootstrap cs.mcp:cs-mcp_3:<version> --standalone -o cs-mcp
+cs bootstrap com.dwolla:cs-mcp_3:<version> --standalone -o cs-mcp
 ```
 
-(`cs.mcp` is `build.sbt`'s current `organization` — not necessarily
-what we'll actually publish under; decide the real Maven Central
-`groupId` when we get there, e.g. something under a registered
-domain, and update this command to match.) No `-M`/`--main-class`
+(`com.dwolla` is `build.sbt`'s `organization` — the Maven Central
+`groupId` this will actually publish under.) No `-M`/`--main-class`
 needed — confirmed sbt's default
 packaging stamps `Main-Class: cs.mcp.Main` into the jar's manifest
 automatically since `Main` is the only discovered main class, and `cs
@@ -298,7 +296,7 @@ assumption stops holding (e.g. distributing to people who'd install
 
 ```bash
 sbt publishLocal
-cs bootstrap "cs.mcp:cs-mcp_3:0.1.0-SNAPSHOT" -o cs-mcp -f
+cs bootstrap "com.dwolla:cs-mcp_3:0.1.0-SNAPSHOT" -o cs-mcp -f
 ```
 
 `sbt publishLocal` writes to `~/.ivy2/local`, which `cs bootstrap`
@@ -307,9 +305,11 @@ matches `cs fetch --help-full`'s description of the default repos as
 "~/.ivy2/local, and Central"). `-f`/`--force` overwrites the launcher
 from a previous run, needed since the version string doesn't change
 between local iterations (still `0.1.0-SNAPSHOT`) — a real release
-workflow would rely on version bumps instead. Ran this end-to-end,
-including piping a real `initialize`/`tools/list` handshake through the
-resulting launcher and getting back the correct four-tool response —
+workflow would rely on version bumps instead. Ran this end-to-end
+(twice — once before `organization` was set to `com.dwolla`, once
+after), including piping a real `initialize`/`tools/list` handshake
+through the resulting launcher and getting back the correct four-tool
+response —
 same behavior as running `java -cp <classpath> cs.mcp.Main` directly.
 This is the fastest way to test "does this work as a real installed
 launcher" without a full classpath string or an actual publish.
