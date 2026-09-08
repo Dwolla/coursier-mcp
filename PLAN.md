@@ -255,6 +255,65 @@ cs-mcp/
    equivalent expected here — check each command's actual semantics
    before assuming).
 
+## Distribution (for later — not needed until this is actually published)
+
+The eventual plan is to push this to GitHub and publish it to Maven
+Central (snapshot or release). Once that's done, `cs bootstrap` becomes
+the intended install path:
+
+```bash
+cs bootstrap cs.mcp:cs-mcp_3:<version> --standalone -o cs-mcp
+```
+
+(`cs.mcp` is `build.sbt`'s current `organization` — not necessarily
+what we'll actually publish under; decide the real Maven Central
+`groupId` when we get there, e.g. something under a registered
+domain, and update this command to match.) No `-M`/`--main-class`
+needed — confirmed sbt's default
+packaging stamps `Main-Class: cs.mcp.Main` into the jar's manifest
+automatically since `Main` is the only discovered main class, and `cs
+bootstrap` reads that. `--standalone` embeds every dependency jar so
+the launcher runs with no network/cache dependency at all — the right
+choice for something users download once and keep; the default
+(small launcher, downloads deps from the coursier cache on first run)
+is more for ephemeral/CI use.
+
+**Recommendation: document this as a one-line install command in the
+README, don't build CI-published launcher binaries for v1.** Coursier's
+own project *does* build and attach bootstrap/native launchers to
+GitHub Releases as part of its own release CI
+(https://github.com/coursier/coursier/releases,
+https://github.com/coursier/setup-action) — that's a real, established
+pattern, and could be added later (a release workflow step running `cs
+bootstrap` against the just-published coordinate, or against a
+same-job `publishLocal` build to avoid racing Central's sync, then
+uploading the binary as a release asset). But that investment makes
+sense for a tool whose users might not have `cs` installed yet; ours
+already require `cs` to do anything useful, so a documented
+`cs bootstrap` command is proportionate for v1. Revisit if that
+assumption stops holding (e.g. distributing to people who'd install
+`cs` and this tool together).
+
+**Local iteration without publishing anywhere — verified working:**
+
+```bash
+sbt publishLocal
+cs bootstrap "cs.mcp:cs-mcp_3:0.1.0-SNAPSHOT" -o cs-mcp -f
+```
+
+`sbt publishLocal` writes to `~/.ivy2/local`, which `cs bootstrap`
+already searches by default (confirmed — no `-r ivy2local` needed; this
+matches `cs fetch --help-full`'s description of the default repos as
+"~/.ivy2/local, and Central"). `-f`/`--force` overwrites the launcher
+from a previous run, needed since the version string doesn't change
+between local iterations (still `0.1.0-SNAPSHOT`) — a real release
+workflow would rely on version bumps instead. Ran this end-to-end,
+including piping a real `initialize`/`tools/list` handshake through the
+resulting launcher and getting back the correct four-tool response —
+same behavior as running `java -cp <classpath> cs.mcp.Main` directly.
+This is the fastest way to test "does this work as a real installed
+launcher" without a full classpath string or an actual publish.
+
 ## Workflow
 
 - No GitHub repo set up yet — local git only. Work happens on branches;
