@@ -2,7 +2,6 @@ package cs.mcp.tools
 
 import cats.effect.IO
 import cats.effect.kernel.Ref
-import ch.linkyard.mcp.jsonrpc2.Authentication
 import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.protocol.Elicitation
 import ch.linkyard.mcp.protocol.Initialize.ClientCapabilities
