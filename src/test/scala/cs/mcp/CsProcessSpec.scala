@@ -10,11 +10,11 @@ class CsProcessSpec extends CatsEffectSuite:
   test(
     "run(List(\"version\")) returns exit code 0 and stdout containing a version string".tag(IntegrationTest)
   ) {
-    assume(csOnPath, "cs is not on PATH")
-    CsProcess.run[IO](List("version")).map { result =>
-      assertEquals(result.exitCode, 0)
-      assert(result.stdout.trim.nonEmpty, s"expected non-empty stdout, got: ${result.stdout}")
-    }
+    assumeIO(csOnPath, "cs is not on PATH") >>
+      CsProcess.run[IO](List("version")).map { result =>
+        assertEquals(result.exitCode, 0)
+        assert(result.stdout.trim.nonEmpty, s"expected non-empty stdout, got: ${result.stdout}")
+      }
   }
 
   test("run drains stdout and stderr concurrently, so a large stderr write can't block a small stdout read") {

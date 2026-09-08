@@ -8,6 +8,7 @@ import ch.linkyard.mcp.protocol.Tool.CallTool
 import ch.linkyard.mcp.server.CallContext
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
+import cs.mcp.assumeIO
 import cs.mcp.csOnPath
 import io.circe.Json
 import io.circe.JsonObject
@@ -76,13 +77,14 @@ class FetchToolSpec extends CatsEffectSuite:
   }
 
   test("fetch resolves a real dependency via the cs binary".tag(IntegrationTest)) {
-    assume(csOnPath, "cs is not on PATH")
-    val tool = FetchTool.default[IO]
-    val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
+    assumeIO(csOnPath, "cs is not on PATH") >> {
+      val tool = FetchTool.default[IO]
+      val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
 
-    tool.apply(args, noopContext).map {
-      case CallTool.Response.Success(_, Some(structured), _) =>
-        assertEquals(structured("dependencies").flatMap(_.asArray).exists(_.nonEmpty), true)
-      case other => fail(s"expected a successful structured response, got $other")
+      tool.apply(args, noopContext).map {
+        case CallTool.Response.Success(_, Some(structured), _) =>
+          assertEquals(structured("dependencies").flatMap(_.asArray).exists(_.nonEmpty), true)
+        case other => fail(s"expected a successful structured response, got $other")
+      }
     }
   }

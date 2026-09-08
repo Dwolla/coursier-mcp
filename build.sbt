@@ -47,6 +47,7 @@ lazy val root = (project in file("."))
       "org.scalameta" %% "munit" % munitVersion % Test,
       "org.typelevel" %% "munit-cats-effect" % munitCatsEffectVersion % Test,
       "org.scalameta" %% "munit-scalacheck" % munitScalacheckVersion % Test,
+      "org.typelevel" %% "mouse" % "1.4.0" % Test,
     ),
     testFrameworks += new TestFramework("munit.Framework"),
     // MainSpec spawns `java -cp <classpath> cs.mcp.Main` and relies on

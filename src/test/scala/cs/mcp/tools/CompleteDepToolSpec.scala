@@ -9,6 +9,7 @@ import ch.linkyard.mcp.protocol.Tool.CallTool
 import ch.linkyard.mcp.server.CallContext
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
+import cs.mcp.assumeIO
 import cs.mcp.csOnPath
 import io.circe.Json
 import io.circe.JsonObject
@@ -58,7 +59,7 @@ class CompleteDepToolSpec extends CatsEffectSuite:
   }
 
   test("complete-dep completes a real Maven coordinate via the cs binary".tag(IntegrationTest)) {
-    assume(csOnPath, "cs is not on PATH")
+    assumeIO(csOnPath, "cs is not on PATH") >> {
     val tool = CompleteDepTool.default[IO]
     val args = JsonObject("prefix" -> "org.typelevel:cats-effect".asJson)
 
@@ -67,6 +68,7 @@ class CompleteDepToolSpec extends CatsEffectSuite:
         assertEquals(structured("completions").flatMap(_.asArray).exists(_.nonEmpty), true)
       case other => fail(s"expected a successful structured response, got $other")
     }
+      }
   }
 
   test("a scalaVersion argument is passed through as --scala-version") {
@@ -94,13 +96,13 @@ class CompleteDepToolSpec extends CatsEffectSuite:
   test(
     "the sbt-style :: shorthand only resolves to unsuffixed names when scalaVersion is given".tag(IntegrationTest)
   ) {
-    assume(csOnPath, "cs is not on PATH")
     val tool = CompleteDepTool.default[IO]
     val withoutScalaVersion = JsonObject("prefix" -> "org.typelevel::cats-effect".asJson)
     val withScalaVersion =
       JsonObject("prefix" -> "org.typelevel::cats-effect".asJson, "scalaVersion" -> "3".asJson)
 
     for
+      _ <- assumeIO(csOnPath, "cs is not on PATH")
       withoutResponse <- tool.apply(withoutScalaVersion, noopContext)
       withResponse <- tool.apply(withScalaVersion, noopContext)
     yield (withoutResponse, withResponse) match

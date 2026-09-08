@@ -2,17 +2,12 @@ package cs.mcp.tools
 
 import cats.effect.IO
 import cats.effect.kernel.Ref
-import ch.linkyard.mcp.protocol.Content
-import ch.linkyard.mcp.protocol.LoggingLevel
-import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Tool.CallTool
+import ch.linkyard.mcp.protocol.{Content, LoggingLevel, Meta}
 import ch.linkyard.mcp.server.CallContext
-import cs.mcp.CsResult
-import cs.mcp.IntegrationTest
-import cs.mcp.csOnPath
-import io.circe.Json
-import io.circe.JsonObject
+import cs.mcp.{CsResult, IntegrationTest, assumeIO, csOnPath}
 import io.circe.syntax.*
+import io.circe.{Json, JsonObject}
 import munit.CatsEffectSuite
 
 class ResolveToolSpec extends CatsEffectSuite:
@@ -109,15 +104,16 @@ class ResolveToolSpec extends CatsEffectSuite:
   }
 
   test("resolves a real dependency's transitive graph via the cs binary".tag(IntegrationTest)) {
-    assume(csOnPath, "cs is not on PATH")
-    val tool = ResolveTool.default[IO]
-    val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
+    assumeIO(csOnPath, "cs is not on PATH") >> {
+      val tool = ResolveTool.default[IO]
+      val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
 
-    tool.apply(args, noopContext).map {
-      case CallTool.Response.Success(_, Some(structured), _) =>
-        val organizations = structured("dependencies").flatMap(_.asArray).getOrElse(Vector.empty)
-          .flatMap(_.asObject).flatMap(_("organization")).flatMap(_.asString)
-        assert(organizations.contains("org.typelevel"), s"expected org.typelevel among resolved deps, got $structured")
-      case other => fail(s"expected a successful structured response, got $other")
+      tool.apply(args, noopContext).map {
+        case CallTool.Response.Success(_, Some(structured), _) =>
+          val organizations = structured("dependencies").flatMap(_.asArray).getOrElse(Vector.empty)
+            .flatMap(_.asObject).flatMap(_("organization")).flatMap(_.asString)
+          assert(organizations.contains("org.typelevel"), s"expected org.typelevel among resolved deps, got $structured")
+        case other => fail(s"expected a successful structured response, got $other")
+      }
     }
   }

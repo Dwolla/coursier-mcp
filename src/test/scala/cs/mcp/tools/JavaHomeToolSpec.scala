@@ -15,6 +15,7 @@ import ch.linkyard.mcp.server.CallContext
 import ch.linkyard.mcp.server.McpServer
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
+import cs.mcp.assumeIO
 import cs.mcp.csOnPath
 import io.circe.Json
 import io.circe.JsonObject
@@ -152,12 +153,13 @@ class JavaHomeToolSpec extends CatsEffectSuite:
   test(
     "java-home resolves the system JVM via the offline probe, no network needed".tag(IntegrationTest)
   ) {
-    assume(csOnPath, "cs is not on PATH")
-    val tool = JavaHomeTool.default[IO](refusingClient)
+    assumeIO(csOnPath, "cs is not on PATH") >> {
+      val tool = JavaHomeTool.default[IO](refusingClient)
 
-    tool.apply(JsonObject.empty, noopContext).map {
-      case CallTool.Response.Success(_, Some(structured), _) =>
-        assert(structured("path").flatMap(_.asString).exists(_.nonEmpty), s"expected a non-empty path, got $structured")
-      case other => fail(s"expected a successful structured response, got $other")
+      tool.apply(JsonObject.empty, noopContext).map {
+        case CallTool.Response.Success(_, Some(structured), _) =>
+          assert(structured("path").flatMap(_.asString).exists(_.nonEmpty), s"expected a non-empty path, got $structured")
+        case other => fail(s"expected a successful structured response, got $other")
+      }
     }
   }
