@@ -296,7 +296,7 @@ assumption stops holding (e.g. distributing to people who'd install
 
 ```bash
 sbt publishLocal
-cs bootstrap "com.dwolla:cs-mcp_3:0.1.0-SNAPSHOT" -o cs-mcp -f
+cs bootstrap "com.dwolla:cs-mcp_3:0.1.0-SNAPSHOT" -o bin/cs-mcp -f
 ```
 
 `sbt publishLocal` writes to `~/.ivy2/local`, which `cs bootstrap`
@@ -306,13 +306,46 @@ matches `cs fetch --help-full`'s description of the default repos as
 from a previous run, needed since the version string doesn't change
 between local iterations (still `0.1.0-SNAPSHOT`) — a real release
 workflow would rely on version bumps instead. Ran this end-to-end
-(twice — once before `organization` was set to `com.dwolla`, once
-after), including piping a real `initialize`/`tools/list` handshake
-through the resulting launcher and getting back the correct four-tool
-response —
-same behavior as running `java -cp <classpath> cs.mcp.Main` directly.
-This is the fastest way to test "does this work as a real installed
-launcher" without a full classpath string or an actual publish.
+(three times now — before `organization` was `com.dwolla`, after, and
+again outputting to `bin/cs-mcp`), including piping a real
+`initialize`/`tools/list` handshake through the resulting launcher and
+getting back the correct four-tool response — same behavior as running
+`java -cp <classpath> cs.mcp.Main` directly. This is the fastest way to
+test "does this work as a real installed launcher" without a full
+classpath string or an actual publish. `bin/` is gitignored — the
+launcher is a generated build artifact, rebuild it after every code
+change with the two commands above (`cs bootstrap ... -f` picks up
+whatever `sbt publishLocal` most recently wrote for that version).
+
+### Registering the launcher with Claude Code
+
+Once `bin/cs-mcp` exists (built as above), register it as a local MCP
+server:
+
+```bash
+claude mcp add cs-mcp -- /absolute/path/to/cs-mcp/bin/cs-mcp
+```
+
+Must be an absolute path — Claude Code spawns the command from wherever
+the current session's working directory happens to be, not necessarily
+this repo. `--scope project` instead of the default `local` if you want
+it checked into `.mcp.json` for the whole team instead of just this
+machine's Claude config; `--scope user` for "available in every
+project regardless of cwd."
+
+Verify and use:
+
+```bash
+claude mcp list        # should show cs-mcp as ✔ Connected
+claude mcp get cs-mcp  # inspect the registered command
+```
+
+Then in a session, `/mcp` lists its tools, or just ask Claude to
+resolve/fetch/complete a dependency and it'll reach for the tool
+directly. `claude mcp remove cs-mcp` to undo. Re-run the two `bin/`
+build commands after any code change — Claude Code doesn't rebuild the
+launcher itself, and `claude mcp add` doesn't need to be re-run for
+that (it re-execs the same path each session).
 
 ## Workflow
 
