@@ -11,23 +11,19 @@ import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Roots
 import ch.linkyard.mcp.protocol.Sampling
 import ch.linkyard.mcp.protocol.Tool.CallTool
-import ch.linkyard.mcp.server.CallContext
 import ch.linkyard.mcp.server.McpServer
+import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
 import cs.mcp.csOnPath
+import cs.mcp.noopContext
 import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import munit.CatsEffectSuite
 
 class JavaHomeToolSpec extends CatsEffectSuite:
-
-  private val noopContext: CallContext[IO] = new CallContext[IO]:
-    override val meta: Meta = Meta.empty
-    override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
-    override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit
 
   private def fakeClient(response: Elicitation.Create.Response): McpServer.Client[IO] =
     new McpServer.Client[IO]:
@@ -162,4 +158,9 @@ class JavaHomeToolSpec extends CatsEffectSuite:
         case other => fail(s"expected a successful structured response, got $other")
       }
     }
+  }
+
+  test("JavaHomeTool.info.effect is Additive(idempotent = true)") {
+    val tool = JavaHomeTool.default[IO](refusingClient)
+    assertEquals(tool.info.effect, ToolFunction.Effect.Additive(idempotent = true))
   }

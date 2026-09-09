@@ -2,7 +2,9 @@ package cs.mcp.tools
 
 import cats.effect.kernel.Concurrent
 import cats.syntax.all.*
+import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.server.ToolFunction
+import ch.linkyard.mcp.server.ToolFunction.ToolError
 import com.melvinlow.json.schema.generic.auto.given
 import cs.mcp.CsProcess
 import cs.mcp.CsResult
@@ -16,11 +18,20 @@ final case class FetchArgs(dependencies: List[String]) derives Decoder
 
 final case class FetchDependency(
   coord: String,
-  file: String,
+  file: Option[String],
   directDependencies: List[String],
   dependencies: List[String],
-) derives Decoder,
-      Encoder.AsObject
+) derives Decoder
+
+object FetchDependency:
+  // cs's --json-output-file emits an explicit "file": null for pom/BOM
+  // coordinates. A schema-validating MCP client would reject that against
+  // the published {"type":"string"} schema for `file` (see
+  // optionJsonSchemaEncoder in ToolSupport.scala), so the null-valued key
+  // is stripped entirely rather than encoded as null; an absent key is
+  // fine against that schema.
+  given Encoder.AsObject[FetchDependency] =
+    Encoder.AsObject.derived[FetchDependency].mapJsonObject(_.filter { case (_, v) => !v.isNull })
 
 final case class ConflictResolution(requested: String, resolved: String) derives Encoder.AsObject
 
@@ -39,7 +50,7 @@ object FetchTool:
     name = "fetch",
     title = None,
     description = "Transitively fetch the JARs of one or more dependencies or an application.".some,
-    effect = ToolFunction.Effect.ReadOnly,
+    effect = ToolFunction.Effect.Additive(idempotent = true),
     isOpenWorld = true,
   )
 
@@ -54,7 +65,9 @@ object FetchTool:
         result <- runCs("fetch" :: "--json-output-file" :: path.toString :: args.dependencies)
         _ <- failIfNonZero[F]("fetch", result)
         json <- Files[F].readUtf8(path).compile.string
-        raw <- decode[RawFetchOutput](json).liftTo[F]
+        raw <- decode[RawFetchOutput](json).leftMap { err =>
+          ToolError(List(Content.Text(s"failed to parse cs fetch's JSON output: ${err.getMessage}")))
+        }.liftTo[F]
       yield FetchResult(
         dependencies = raw.dependencies,
         conflictResolution = raw.conflict_resolution.toList.map { case (requested, resolved) =>

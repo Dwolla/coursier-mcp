@@ -28,6 +28,12 @@ these choices.
     (Confirmed via `cs complete-dep org.typelevel:cats-effect` — the command
     is `complete-dep`, not `complete`; it's hidden from `cs --help`/
     `--help-full`'s top-level command listing but works directly.)
+    (2026-09-09 amendment: "read-only" above describes the
+    confirmation-grouping decision, not the `ToolFunction.Effect`
+    wire-protocol metadata. `fetch`'s `Effect` label was found inaccurate
+    — it does write to coursier's local cache — and corrected to
+    `Additive(idempotent = true)`; it still requires no confirmation,
+    which is unchanged.)
   - Mutating/code-executing, **require explicit confirmation via MCP
     elicitation before executing**: `launch`, `install`, `setup`, and
     **`java-home` when it would need to download a JVM** (see verified
@@ -106,6 +112,15 @@ these choices.
   `Map[String, String]` conflict_resolution into a `List[ConflictResolution]`
   case class). Check this again if a future tool's natural shape wants
   `Option`/`Map`.
+  (2026-09-09 amendment: `FetchDependency.file` is now a deliberate,
+  documented exception to this rule. `cs` emits an explicit `"file": null`
+  for pom/BOM coordinates, and the schema-derivation gap above means an
+  `Option[String]` field's *schema* is indistinguishable from a required
+  `String`'s — so a literal `null` in the payload would fail
+  schema-validating clients. `FetchDependency` keeps `file: Option[String]`
+  but supplies a custom `Encoder.AsObject` that strips the key entirely
+  when it's `None`, rather than the derived encoder's default of emitting
+  `null` — see `FetchTool.scala`.)
 - `cs complete-dep`'s `-e`/`--scala-version` flag is not just documentation
   filler — confirmed by reading coursier's own source
   (`coursier.core.Repository.Complete.parse`, in the `coursier` module,

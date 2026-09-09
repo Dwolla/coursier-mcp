@@ -2,25 +2,19 @@ package cs.mcp.tools
 
 import cats.effect.IO
 import ch.linkyard.mcp.protocol.Content
-import ch.linkyard.mcp.protocol.LoggingLevel
-import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Tool.CallTool
-import ch.linkyard.mcp.server.CallContext
+import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
 import cs.mcp.csOnPath
+import cs.mcp.noopContext
 import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import munit.CatsEffectSuite
 
 class FetchToolSpec extends CatsEffectSuite:
-
-  private val noopContext: CallContext[IO] = new CallContext[IO]:
-    override val meta: Meta = Meta.empty
-    override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
-    override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit
 
   private def writeJsonTo(path: String, json: String): IO[Unit] =
     IO.blocking(java.nio.file.Files.writeString(java.nio.file.Path.of(path), json)).void
@@ -58,6 +52,39 @@ class FetchToolSpec extends CatsEffectSuite:
     }
   }
 
+  private val fakeJsonWithNullFile =
+    """{
+      |  "dependencies": [
+      |    {
+      |      "coord": "com.fasterxml.jackson:jackson-bom:2.17.0",
+      |      "file": null,
+      |      "directDependencies": [],
+      |      "dependencies": []
+      |    }
+      |  ],
+      |  "conflict_resolution": {},
+      |  "version": "0.1.0"
+      |}""".stripMargin
+
+  test("omits the file key from the response when cs reports a pom/BOM dependency's file as null") {
+    val fakeRunCs: List[String] => IO[CsResult] = argv =>
+      val path = argv(argv.indexOf("--json-output-file") + 1)
+      writeJsonTo(path, fakeJsonWithNullFile).as(CsResult(0, "", ""))
+
+    val tool = FetchTool[IO](fakeRunCs)
+    val args = JsonObject("dependencies" -> List("com.fasterxml.jackson:jackson-bom:2.17.0").asJson)
+
+    tool.apply(args, noopContext).map {
+      case CallTool.Response.Success(_, Some(structured), _) =>
+        val dependency = structured("dependencies").flatMap(_.asArray).get.head
+        assert(
+          dependency.asObject.exists(obj => !obj.contains("file")),
+          s"expected no 'file' key, got $dependency",
+        )
+      case other => fail(s"expected a successful structured response, got $other")
+    }
+  }
+
   test("a non-zero exit code surfaces cs's stderr as a tool error") {
     val fakeRunCs: List[String] => IO[CsResult] = _ => IO.pure(CsResult(1, "", "Error: dependency not found"))
     val tool = FetchTool[IO](fakeRunCs)
@@ -76,6 +103,27 @@ class FetchToolSpec extends CatsEffectSuite:
     }
   }
 
+  test("malformed JSON in cs's --json-output-file surfaces as a tool error") {
+    val fakeRunCs: List[String] => IO[CsResult] = argv =>
+      val path = argv(argv.indexOf("--json-output-file") + 1)
+      writeJsonTo(path, "not valid json").as(CsResult(0, "", ""))
+
+    val tool = FetchTool[IO](fakeRunCs)
+    val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
+
+    tool.apply(args, noopContext).map {
+      case CallTool.Response.Error(content, _) =>
+        assert(
+          content.exists {
+            case Content.Text(text, _, _) => text.contains("failed to parse cs fetch's JSON output")
+            case _                        => false
+          },
+          s"expected a parse-failure message in error content, got $content",
+        )
+      case other => fail(s"expected an error response, got $other")
+    }
+  }
+
   test("fetch resolves a real dependency via the cs binary".tag(IntegrationTest)) {
     assumeIO(csOnPath, "cs is not on PATH") >> {
       val tool = FetchTool.default[IO]
@@ -87,4 +135,27 @@ class FetchToolSpec extends CatsEffectSuite:
         case other => fail(s"expected a successful structured response, got $other")
       }
     }
+  }
+
+  test("fetch resolves a real pom/BOM coordinate whose file is null via the cs binary".tag(IntegrationTest)) {
+    assumeIO(csOnPath, "cs is not on PATH") >> {
+      val tool = FetchTool.default[IO]
+      val args = JsonObject("dependencies" -> List("com.fasterxml.jackson:jackson-bom:2.17.0").asJson)
+
+      tool.apply(args, noopContext).map {
+        case CallTool.Response.Success(_, Some(structured), _) =>
+          val dependencies = structured("dependencies").flatMap(_.asArray).getOrElse(Vector.empty)
+          assert(dependencies.nonEmpty, "expected at least one dependency")
+          assert(
+            dependencies.exists(dep => dep.asObject.exists(obj => !obj.contains("file"))),
+            s"expected at least one dependency without a 'file' key, got $dependencies",
+          )
+        case other => fail(s"expected a successful structured response, got $other")
+      }
+    }
+  }
+
+  test("FetchTool.info.effect is Additive(idempotent = true)") {
+    val tool = FetchTool[IO](_ => IO.pure(CsResult(0, "", "")))
+    assertEquals(tool.info.effect, ToolFunction.Effect.Additive(idempotent = true))
   }
