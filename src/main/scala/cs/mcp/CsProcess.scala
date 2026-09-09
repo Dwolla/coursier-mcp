@@ -21,6 +21,7 @@ object CsProcess:
         process.stderr.through(text.utf8.decode).compile.string,
         process.exitValue,
       ).parMapN((stdout, stderr, exitCode) => CsResult(exitCode, stdout, stderr))
-    }.adaptError { case e =>
-      ToolError(List(Content.Text(s"failed to run `$command ${args.mkString(" ")}`: ${e.getMessage}")))
+    }.adaptError {
+      case e: ToolError => e
+      case e            => ToolError(List(Content.Text(s"failed to run `$command ${args.mkString(" ")}`: ${e.getMessage}")))
     }
