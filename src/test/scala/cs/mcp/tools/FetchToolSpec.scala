@@ -2,26 +2,19 @@ package cs.mcp.tools
 
 import cats.effect.IO
 import ch.linkyard.mcp.protocol.Content
-import ch.linkyard.mcp.protocol.LoggingLevel
-import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Tool.CallTool
-import ch.linkyard.mcp.server.CallContext
 import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
 import cs.mcp.csOnPath
+import cs.mcp.noopContext
 import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import munit.CatsEffectSuite
 
 class FetchToolSpec extends CatsEffectSuite:
-
-  private val noopContext: CallContext[IO] = new CallContext[IO]:
-    override val meta: Meta = Meta.empty
-    override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
-    override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit
 
   private def writeJsonTo(path: String, json: String): IO[Unit] =
     IO.blocking(java.nio.file.Files.writeString(java.nio.file.Path.of(path), json)).void
