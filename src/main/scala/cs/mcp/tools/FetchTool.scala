@@ -2,7 +2,9 @@ package cs.mcp.tools
 
 import cats.effect.kernel.Concurrent
 import cats.syntax.all.*
+import ch.linkyard.mcp.protocol.Content
 import ch.linkyard.mcp.server.ToolFunction
+import ch.linkyard.mcp.server.ToolFunction.ToolError
 import com.melvinlow.json.schema.generic.auto.given
 import cs.mcp.CsProcess
 import cs.mcp.CsResult
@@ -54,7 +56,9 @@ object FetchTool:
         result <- runCs("fetch" :: "--json-output-file" :: path.toString :: args.dependencies)
         _ <- failIfNonZero[F]("fetch", result)
         json <- Files[F].readUtf8(path).compile.string
-        raw <- decode[RawFetchOutput](json).liftTo[F]
+        raw <- decode[RawFetchOutput](json).leftMap { err =>
+          ToolError(List(Content.Text(s"failed to parse cs fetch's JSON output: ${err.getMessage}")))
+        }.liftTo[F]
       yield FetchResult(
         dependencies = raw.dependencies,
         conflictResolution = raw.conflict_resolution.toList.map { case (requested, resolved) =>

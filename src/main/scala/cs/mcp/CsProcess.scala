@@ -3,6 +3,8 @@ package cs.mcp
 import cats.effect.kernel.Concurrent
 import cats.effect.kernel.implicits.parallelForGenSpawn
 import cats.syntax.all.*
+import ch.linkyard.mcp.protocol.Content
+import ch.linkyard.mcp.server.ToolFunction.ToolError
 import fs2.io.process.{ProcessBuilder, Processes}
 import fs2.text
 
@@ -19,4 +21,6 @@ object CsProcess:
         process.stderr.through(text.utf8.decode).compile.string,
         process.exitValue,
       ).parMapN((stdout, stderr, exitCode) => CsResult(exitCode, stdout, stderr))
+    }.adaptError { case e =>
+      ToolError(List(Content.Text(s"failed to run `$command ${args.mkString(" ")}`: ${e.getMessage}")))
     }

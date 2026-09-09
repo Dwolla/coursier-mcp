@@ -106,6 +106,27 @@ class FetchToolSpec extends CatsEffectSuite:
     }
   }
 
+  test("malformed JSON in cs's --json-output-file surfaces as a tool error") {
+    val fakeRunCs: List[String] => IO[CsResult] = argv =>
+      val path = argv(argv.indexOf("--json-output-file") + 1)
+      writeJsonTo(path, "not valid json").as(CsResult(0, "", ""))
+
+    val tool = FetchTool[IO](fakeRunCs)
+    val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
+
+    tool.apply(args, noopContext).map {
+      case CallTool.Response.Error(content, _) =>
+        assert(
+          content.exists {
+            case Content.Text(text, _, _) => text.contains("failed to parse cs fetch's JSON output")
+            case _                        => false
+          },
+          s"expected a parse-failure message in error content, got $content",
+        )
+      case other => fail(s"expected an error response, got $other")
+    }
+  }
+
   test("fetch resolves a real dependency via the cs binary".tag(IntegrationTest)) {
     assumeIO(csOnPath, "cs is not on PATH") >> {
       val tool = FetchTool.default[IO]
