@@ -41,7 +41,7 @@ object FetchTool:
     name = "fetch",
     title = None,
     description = "Transitively fetch the JARs of one or more dependencies or an application.".some,
-    effect = ToolFunction.Effect.ReadOnly,
+    effect = ToolFunction.Effect.Additive(idempotent = true),
     isOpenWorld = true,
   )
 

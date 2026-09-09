@@ -13,6 +13,7 @@ import ch.linkyard.mcp.protocol.Sampling
 import ch.linkyard.mcp.protocol.Tool.CallTool
 import ch.linkyard.mcp.server.CallContext
 import ch.linkyard.mcp.server.McpServer
+import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
@@ -162,4 +163,9 @@ class JavaHomeToolSpec extends CatsEffectSuite:
         case other => fail(s"expected a successful structured response, got $other")
       }
     }
+  }
+
+  test("JavaHomeTool.info.effect is Additive(idempotent = true)") {
+    val tool = JavaHomeTool.default[IO](refusingClient)
+    assertEquals(tool.info.effect, ToolFunction.Effect.Additive(idempotent = true))
   }

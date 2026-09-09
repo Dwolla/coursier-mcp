@@ -6,6 +6,7 @@ import ch.linkyard.mcp.protocol.LoggingLevel
 import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Tool.CallTool
 import ch.linkyard.mcp.server.CallContext
+import ch.linkyard.mcp.server.ToolFunction
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
@@ -151,4 +152,10 @@ class FetchToolSpec extends CatsEffectSuite:
         case other => fail(s"expected a successful structured response, got $other")
       }
     }
+  }
+
+  test("FetchTool.info.effect is Additive(idempotent = true)") {
+    val fakeRunCs: List[String] => IO[CsResult] = _ => IO.pure(CsResult(0, "", ""))
+    val tool = FetchTool[IO](fakeRunCs)
+    assertEquals(tool.info.effect, ToolFunction.Effect.Additive(idempotent = true))
   }
