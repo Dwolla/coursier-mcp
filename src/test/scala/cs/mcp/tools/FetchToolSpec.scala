@@ -66,7 +66,7 @@ class FetchToolSpec extends CatsEffectSuite:
       |  "version": "0.1.0"
       |}""".stripMargin
 
-  test("decodes a pom/BOM dependency whose file is null without crashing") {
+  test("omits the file key from the response when cs reports a pom/BOM dependency's file as null") {
     val fakeRunCs: List[String] => IO[CsResult] = argv =>
       val path = argv(argv.indexOf("--json-output-file") + 1)
       writeJsonTo(path, fakeJsonWithNullFile).as(CsResult(0, "", ""))
@@ -76,8 +76,11 @@ class FetchToolSpec extends CatsEffectSuite:
 
     tool.apply(args, noopContext).map {
       case CallTool.Response.Success(_, Some(structured), _) =>
-        val file = structured("dependencies").flatMap(_.asArray).get.head.hcursor.downField("file")
-        assertEquals(file.focus, Some(Json.Null))
+        val dependency = structured("dependencies").flatMap(_.asArray).get.head
+        assert(
+          dependency.asObject.exists(obj => !obj.contains("file")),
+          s"expected no 'file' key, got $dependency",
+        )
       case other => fail(s"expected a successful structured response, got $other")
     }
   }
@@ -141,14 +144,18 @@ class FetchToolSpec extends CatsEffectSuite:
 
       tool.apply(args, noopContext).map {
         case CallTool.Response.Success(_, Some(structured), _) =>
-          assertEquals(structured("dependencies").flatMap(_.asArray).exists(_.nonEmpty), true)
+          val dependencies = structured("dependencies").flatMap(_.asArray).getOrElse(Vector.empty)
+          assert(dependencies.nonEmpty, "expected at least one dependency")
+          assert(
+            dependencies.exists(dep => dep.asObject.exists(obj => !obj.contains("file"))),
+            s"expected at least one dependency without a 'file' key, got $dependencies",
+          )
         case other => fail(s"expected a successful structured response, got $other")
       }
     }
   }
 
   test("FetchTool.info.effect is Additive(idempotent = true)") {
-    val fakeRunCs: List[String] => IO[CsResult] = _ => IO.pure(CsResult(0, "", ""))
-    val tool = FetchTool[IO](fakeRunCs)
+    val tool = FetchTool[IO](_ => IO.pure(CsResult(0, "", "")))
     assertEquals(tool.info.effect, ToolFunction.Effect.Additive(idempotent = true))
   }

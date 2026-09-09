@@ -21,8 +21,17 @@ final case class FetchDependency(
   file: Option[String],
   directDependencies: List[String],
   dependencies: List[String],
-) derives Decoder,
-      Encoder.AsObject
+) derives Decoder
+
+object FetchDependency:
+  // cs's --json-output-file emits an explicit "file": null for pom/BOM
+  // coordinates. A schema-validating MCP client would reject that against
+  // the published {"type":"string"} schema for `file` (see
+  // optionJsonSchemaEncoder in ToolSupport.scala), so the null-valued key
+  // is stripped entirely rather than encoded as null; an absent key is
+  // fine against that schema.
+  given Encoder.AsObject[FetchDependency] =
+    Encoder.AsObject.derived[FetchDependency].mapJsonObject(_.filter { case (_, v) => !v.isNull })
 
 final case class ConflictResolution(requested: String, resolved: String) derives Encoder.AsObject
 

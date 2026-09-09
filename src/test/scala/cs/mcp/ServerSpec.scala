@@ -27,7 +27,7 @@ class ServerSpec extends CatsEffectSuite:
   private def running: Resource[IO, LowlevelMcpServer[IO]] =
     Server[IO].lowlevelFactory(connectionInfo)(noopComms)
 
-  test("tools/list returns the four read-only tools") {
+  test("tools/list returns the four registered tools by name") {
     running.use { lowlevel =>
       val initialize = Initialize(
         capabilities = ClientCapabilities(None, None, None, None),
