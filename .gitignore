@@ -1,0 +1,8 @@
+target/
+bin/
+project/project/
+project/target/
+.bsp/
+.bloop/
+metals.sbt
+.metals/
