@@ -16,7 +16,7 @@ final case class FetchArgs(dependencies: List[String]) derives Decoder
 
 final case class FetchDependency(
   coord: String,
-  file: String,
+  file: Option[String],
   directDependencies: List[String],
   dependencies: List[String],
 ) derives Decoder,

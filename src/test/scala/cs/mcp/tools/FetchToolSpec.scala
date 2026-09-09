@@ -58,6 +58,36 @@ class FetchToolSpec extends CatsEffectSuite:
     }
   }
 
+  private val fakeJsonWithNullFile =
+    """{
+      |  "dependencies": [
+      |    {
+      |      "coord": "com.fasterxml.jackson:jackson-bom:2.17.0",
+      |      "file": null,
+      |      "directDependencies": [],
+      |      "dependencies": []
+      |    }
+      |  ],
+      |  "conflict_resolution": {},
+      |  "version": "0.1.0"
+      |}""".stripMargin
+
+  test("decodes a pom/BOM dependency whose file is null without crashing") {
+    val fakeRunCs: List[String] => IO[CsResult] = argv =>
+      val path = argv(argv.indexOf("--json-output-file") + 1)
+      writeJsonTo(path, fakeJsonWithNullFile).as(CsResult(0, "", ""))
+
+    val tool = FetchTool[IO](fakeRunCs)
+    val args = JsonObject("dependencies" -> List("com.fasterxml.jackson:jackson-bom:2.17.0").asJson)
+
+    tool.apply(args, noopContext).map {
+      case CallTool.Response.Success(_, Some(structured), _) =>
+        val file = structured("dependencies").flatMap(_.asArray).get.head.hcursor.downField("file")
+        assertEquals(file.focus, Some(Json.Null))
+      case other => fail(s"expected a successful structured response, got $other")
+    }
+  }
+
   test("a non-zero exit code surfaces cs's stderr as a tool error") {
     val fakeRunCs: List[String] => IO[CsResult] = _ => IO.pure(CsResult(1, "", "Error: dependency not found"))
     val tool = FetchTool[IO](fakeRunCs)
@@ -80,6 +110,19 @@ class FetchToolSpec extends CatsEffectSuite:
     assumeIO(csOnPath, "cs is not on PATH") >> {
       val tool = FetchTool.default[IO]
       val args = JsonObject("dependencies" -> List("org.typelevel:cats-core_3:2.13.0").asJson)
+
+      tool.apply(args, noopContext).map {
+        case CallTool.Response.Success(_, Some(structured), _) =>
+          assertEquals(structured("dependencies").flatMap(_.asArray).exists(_.nonEmpty), true)
+        case other => fail(s"expected a successful structured response, got $other")
+      }
+    }
+  }
+
+  test("fetch resolves a real pom/BOM coordinate whose file is null via the cs binary".tag(IntegrationTest)) {
+    assumeIO(csOnPath, "cs is not on PATH") >> {
+      val tool = FetchTool.default[IO]
+      val args = JsonObject("dependencies" -> List("com.fasterxml.jackson:jackson-bom:2.17.0").asJson)
 
       tool.apply(args, noopContext).map {
         case CallTool.Response.Success(_, Some(structured), _) =>
