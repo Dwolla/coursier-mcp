@@ -2,11 +2,7 @@ package cs.mcp
 
 import cats.effect.*
 import cats.effect.std.*
-import ch.linkyard.mcp.protocol.LoggingLevel
-import ch.linkyard.mcp.protocol.Meta
-import ch.linkyard.mcp.server.CallContext
 import fs2.io.file.*
-import io.circe.Json
 import mouse.all.*
 import munit.Assertions.munitPrint
 import munit.internal.console.StackTraces
@@ -34,8 +30,3 @@ def assumeIO(cond: IO[Boolean],
       StackTraces.dropInside(new AssumptionViolatedException(munitPrint(clue)))
     }
   }
-
-val noopContext: CallContext[IO] = new CallContext[IO]:
-  override val meta: Meta = Meta.empty
-  override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
-  override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit

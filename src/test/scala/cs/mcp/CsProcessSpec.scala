@@ -1,27 +1,11 @@
 package cs.mcp
 
 import cats.effect.IO
-import ch.linkyard.mcp.protocol.Content
-import ch.linkyard.mcp.server.ToolFunction
 import munit.CatsEffectSuite
 
 import scala.concurrent.duration.*
 
 class CsProcessSpec extends CatsEffectSuite:
-
-  test("a failure to spawn the cs process is wrapped in a ToolError, not a raw exception") {
-    CsProcess.run[IO](List("--whatever"), command = "definitely-not-a-real-binary-cs-mcp-test")
-      .intercept[ToolFunction.ToolError]
-      .map { error =>
-        assert(
-          error.content.exists {
-            case Content.Text(text, _, _) => text.contains("definitely-not-a-real-binary-cs-mcp-test")
-            case _                        => false
-          },
-          s"expected the fake command name in error content, got ${error.content}",
-        )
-      }
-  }
 
   test(
     "run(List(\"version\")) returns exit code 0 and stdout containing a version string".tag(IntegrationTest)

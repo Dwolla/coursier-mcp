@@ -3,13 +3,19 @@ package cs.mcp.tools
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import ch.linkyard.mcp.protocol.Tool.CallTool
-import ch.linkyard.mcp.protocol.Content
-import cs.mcp.{CsResult, IntegrationTest, assumeIO, csOnPath, noopContext}
+import ch.linkyard.mcp.protocol.{Content, LoggingLevel, Meta}
+import ch.linkyard.mcp.server.CallContext
+import cs.mcp.{CsResult, IntegrationTest, assumeIO, csOnPath}
 import io.circe.syntax.*
 import io.circe.{Json, JsonObject}
 import munit.CatsEffectSuite
 
 class ResolveToolSpec extends CatsEffectSuite:
+
+  private val noopContext: CallContext[IO] = new CallContext[IO]:
+    override val meta: Meta = Meta.empty
+    override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
+    override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit
 
   test("parses cs resolve's org:name:version:configuration lines into structured dependencies") {
     val fakeRunCs: List[String] => IO[CsResult] = _ =>

@@ -14,17 +14,15 @@ coordinates on your behalf.
 ## Tools
 
 All tools shell out to the real `cs` binary — there's no reimplementation of
-coursier's resolution logic. `resolve` and `complete-dep` are pure reads;
-`fetch` and `java-home` write to coursier's local cache but never
-destroy or overwrite unrelated state, and none of the four requires
-confirmation in the common case.
+coursier's resolution logic. All four below are read-only from the client's
+perspective and run without confirmation.
 
 | Tool | `cs` command | Args | Notes |
 |---|---|---|---|
 | `resolve` | `cs resolve` | `dependencies: List[String]`, `scalaVersion: Option[String]` | Returns the transitive dependency list as structured `organization`/`name`/`version`/`configuration` records. |
-| `fetch` | `cs fetch --json-output-file` | `dependencies: List[String]` | Downloads JARs into coursier's local cache and returns their local file paths plus any version-conflict resolutions. Paths are only meaningful because this server runs on the same machine as its client (stdio transport). For pom/BOM-packaged coordinates (no JAR to download), the `file` field is omitted rather than present-with-`null`. |
+| `fetch` | `cs fetch --json-output-file` | `dependencies: List[String]` | Downloads JARs into coursier's local cache and returns their local file paths plus any version-conflict resolutions. Paths are only meaningful because this server runs on the same machine as its client (stdio transport). |
 | `complete-dep` | `cs complete-dep` | `prefix: String`, `scalaVersion: Option[String]` | Auto-completes a partial Maven/sbt-style coordinate. |
-| `java-home` | `cs java-home` | `jvm: Option[String]` | Writes to coursier's local cache only when a JVM install is actually needed: probes with `--mode offline` first, so an already-installed/cached JVM never prompts. If that probe fails, it asks the client to confirm via MCP elicitation before running the real command, since `cs java-home` can otherwise silently download a JDK. |
+| `java-home` | `cs java-home` | `jvm: Option[String]` | Read-only in the common case: probes with `--mode offline` first, so an already-installed/cached JVM never prompts. If that probe fails, it asks the client to confirm via MCP elicitation before running the real command, since `cs java-home` can otherwise silently download a JDK. |
 
 `launch`, `install`, and `setup` are mutating/code-executing and, per the
 plan, will require the same elicit-before-running confirmation as

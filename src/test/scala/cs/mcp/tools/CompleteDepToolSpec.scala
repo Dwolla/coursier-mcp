@@ -3,17 +3,25 @@ package cs.mcp.tools
 import cats.effect.IO
 import cats.effect.kernel.Ref
 import ch.linkyard.mcp.protocol.Content
+import ch.linkyard.mcp.protocol.LoggingLevel
+import ch.linkyard.mcp.protocol.Meta
 import ch.linkyard.mcp.protocol.Tool.CallTool
+import ch.linkyard.mcp.server.CallContext
 import cs.mcp.CsResult
 import cs.mcp.IntegrationTest
 import cs.mcp.assumeIO
 import cs.mcp.csOnPath
-import cs.mcp.noopContext
+import io.circe.Json
 import io.circe.JsonObject
 import io.circe.syntax.*
 import munit.CatsEffectSuite
 
 class CompleteDepToolSpec extends CatsEffectSuite:
+
+  private val noopContext: CallContext[IO] = new CallContext[IO]:
+    override val meta: Meta = Meta.empty
+    override def reportProgress(progress: Double, total: Option[Double], message: Option[String]): IO[Unit] = IO.unit
+    override def log(level: LoggingLevel, data: Json): IO[Unit] = IO.unit
 
   test("decodes cs complete-dep's line-oriented stdout into a list of completions") {
     val fakeRunCs: List[String] => IO[CsResult] = _ =>

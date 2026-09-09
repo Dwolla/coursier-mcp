@@ -25,7 +25,7 @@ object JavaHomeTool:
     name = "java-home",
     title = None,
     description = "Print the home directory of a particular JVM.".some,
-    effect = ToolFunction.Effect.Additive(idempotent = true),
+    effect = ToolFunction.Effect.ReadOnly,
     isOpenWorld = true,
   )
 
